@@ -1,6 +1,6 @@
 import os
 
-from flask import Flask
+from flask import Flask, render_template
 from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
@@ -25,6 +25,10 @@ def create_app(testing=False):
     app.register_blueprint(auth_bp, url_prefix="/")
     app.register_blueprint(tasks_bp, url_prefix="/")
     app.register_blueprint(health_bp, url_prefix="/")
+
+    @app.route("/")
+    def index():
+        return render_template("index.html")
 
     with app.app_context():
         from app.models import User, Task
