@@ -60,5 +60,5 @@
 ## Phase 7 - Documentation
 
 - [x] Generate API documentation
-- [x] Generate architecture diagram
-- [ ] Generate user guide
+- [x] Generate architecture documentation
+- [x] Generate database schema documentation

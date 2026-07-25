@@ -13,5 +13,6 @@ build/
 venv/
 instance/
 nohup.out
+*.docx
 presentation.html
 presentation.txt
