@@ -20,9 +20,3 @@ def app():
 @pytest.fixture
 def client(app):
     return app.test_client()
-
-
-@pytest.fixture
-def auth_headers(client):
-    client.post("/login", json={"username": "admin", "password": "password123"})
-    return {}

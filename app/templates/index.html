@@ -138,12 +138,16 @@
     }
 
     async function toggleTask(id, completed) {
-      await api("PUT", "/tasks/" + id, { completed });
+      try {
+        await api("PUT", "/tasks/" + id, { completed });
+      } catch (_) {}
       loadTasks();
     }
 
     async function deleteTask(id) {
-      await api("DELETE", "/tasks/" + id);
+      try {
+        await api("DELETE", "/tasks/" + id);
+      } catch (_) {}
       loadTasks();
     }
 
@@ -153,7 +157,17 @@
       return d.innerHTML;
     }
 
-    if (window.location.pathname === "/") login();
+    // Restore session if already logged in; otherwise show the login form.
+    (async function init() {
+      try {
+        await api("GET", "/profile");
+        document.getElementById("loginView").classList.add("d-none");
+        document.getElementById("appView").classList.remove("d-none");
+        loadApp();
+      } catch (_) {
+        /* not logged in - keep login form visible */
+      }
+    })();
   </script>
 </body>
 </html>
