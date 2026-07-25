@@ -1,6 +1,6 @@
 import os
 
-from flask import Flask, render_template
+from flask import Flask, jsonify, render_template
 from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
@@ -29,6 +29,18 @@ def create_app(testing=False):
     @app.route("/")
     def index():
         return render_template("index.html")
+
+    @app.errorhandler(404)
+    def not_found(_):
+        return jsonify({"error": "Not found"}), 404
+
+    @app.errorhandler(405)
+    def method_not_allowed(_):
+        return jsonify({"error": "Method not allowed"}), 405
+
+    @app.errorhandler(500)
+    def internal_error(_):
+        return jsonify({"error": "Internal server error"}), 500
 
     with app.app_context():
         from app.models import User, Task
