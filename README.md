@@ -21,7 +21,7 @@ This project demonstrates an AI-driven software engineering workflow.
 
 ## Run
 
-python app.py
+python wsgi.py
 
 ## Docker
 
