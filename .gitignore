@@ -16,3 +16,15 @@ nohup.out
 *.docx
 presentation.html
 presentation.txt
+
+# Node / Playwright
+node_modules/
+test-results/
+playwright-report/
+results.json
+playwright-stderr.log
+ui-test-report.pdf
+
+# Agent tooling artifacts
+.jez/
+.opencode/
