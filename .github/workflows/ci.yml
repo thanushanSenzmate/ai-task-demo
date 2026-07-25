@@ -25,7 +25,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: pip install -r requirements.txt
       - run: bandit -r app/ -x tests
-      - run: pip-audit
+      - run: pip-audit --requirement requirements.txt
 
   docker:
     runs-on: ubuntu-latest
