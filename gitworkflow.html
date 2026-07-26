@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anatomy of a GitHub Actions Workflow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0F1720;
+    --panel:#16202C;
+    --ink:#E8ECF2;
+    --muted:#8B98A8;
+    --line:#28333F;
+    --key:#6FA8DC;      /* yaml keys */
+    --val:#E8B369;      /* yaml string values */
+    --action:#5FC9A0;   /* uses / run actions */
+    --flag:#E8746B;     /* warnings / gotchas */
+    --tab-bg:#1D2833;
+    --shadow: 0 1px 2px rgba(0,0,0,0.25), 0 12px 32px rgba(0,0,0,0.35);
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,.display{font-family:'Space Grotesk',sans-serif;}
+  code, .mono, pre{font-family:'JetBrains Mono',monospace;}
+  a{color:var(--key);}
+
+  ::selection{background:#2C4A6B;}
+
+  /* ---------- Layout shell ---------- */
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px;}
+  section{padding:72px 0;border-bottom:1px solid var(--line);}
+  section:last-of-type{border-bottom:none;}
+  .eyebrow{
+    font-family:'JetBrains Mono',monospace;
+    font-size:12.5px;
+    letter-spacing:.06em;
+    color:var(--muted);
+    text-transform:uppercase;
+    margin:0 0 10px 0;
+  }
+  .eyebrow::before{content:"# ";color:var(--key);}
+  h2{font-size:28px;font-weight:600;margin:0 0 14px 0;letter-spacing:-0.01em;}
+  p.lede{color:var(--muted);font-size:16.5px;max-width:680px;margin:0 0 28px 0;}
+
+  /* ---------- Nav ---------- */
+  nav.topnav{
+    position:sticky;top:0;z-index:50;
+    background:rgba(238,241,246,0.88);
+    backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--line);
+  }
+  nav.topnav .inner{
+    max-width:1080px;margin:0 auto;padding:0 24px;
+    display:flex;align-items:center;gap:22px;height:52px;
+    overflow-x:auto;white-space:nowrap;
+  }
+  nav.topnav a{
+    color:var(--muted);text-decoration:none;font-size:13.5px;font-weight:500;
+    font-family:'JetBrains Mono',monospace;
+  }
+  nav.topnav a:hover{color:var(--key);}
+  nav.topnav .brand{color:var(--ink);font-weight:600;font-family:'Space Grotesk',sans-serif;font-size:14px;margin-right:8px;}
+
+  /* ---------- Hero ---------- */
+  .hero{padding:80px 0 60px 0;border-bottom:1px solid var(--line);}
+  .hero-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:48px;align-items:center;}
+  .hero h1{font-size:44px;line-height:1.08;font-weight:700;letter-spacing:-0.02em;margin:0 0 18px 0;}
+  .hero h1 span{color:var(--action);}
+  .hero p{font-size:17px;color:var(--muted);max-width:460px;margin:0 0 26px 0;}
+  .path-chip{
+    display:inline-flex;align-items:center;gap:8px;
+    background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    padding:8px 14px;font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--muted);
+    box-shadow:var(--shadow);
+  }
+  .path-chip::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--action);}
+
+  /* fake editor window */
+  .editor{
+    background:var(--panel);border-radius:12px;border:1px solid var(--line);
+    box-shadow:var(--shadow);overflow:hidden;
+  }
+  .editor-tabbar{
+    display:flex;align-items:center;background:var(--tab-bg);
+    padding:0 12px;height:40px;gap:6px;border-bottom:1px solid var(--line);
+  }
+  .dot{width:10px;height:10px;border-radius:50%;}
+  .dot.r{background:#E4635A;} .dot.y{background:#E8B23D;} .dot.g{background:#3DB871;}
+  .editor-tab{
+    margin-left:14px;font-size:12.5px;color:var(--ink);font-family:'JetBrains Mono',monospace;
+    background:var(--panel);padding:6px 12px;border-radius:6px 6px 0 0;border:1px solid var(--line);border-bottom:none;
+  }
+  .editor-body{padding:18px 0;font-size:13.5px;}
+  .yl{display:grid;grid-template-columns:36px 1fr;}
+  .yl .gutter{color:#B7BEC9;text-align:right;padding-right:12px;user-select:none;font-size:12.5px;}
+  .yl .code{white-space:pre;padding-right:16px;}
+  .k{color:var(--key);} .v{color:var(--val);} .a{color:var(--action);} .c{color:#8A93A2;font-style:italic;}
+
+  /* ---------- Annotated workflow (signature element) ---------- */
+  .anno-shell{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start;}
+  @media (max-width:860px){.anno-shell{grid-template-columns:1fr;}}
+  .anno-shell .editor{position:sticky;top:70px;}
+  .yl.clickable{cursor:pointer;border-radius:5px;transition:background .15s ease;}
+  .yl.clickable:hover{background:#1A2733;}
+  .yl.active{background:#1F3040;}
+  .cards{display:flex;flex-direction:column;gap:10px;max-height:640px;overflow-y:auto;padding-right:4px;}
+  .card{
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    padding:16px 18px;transition:border-color .15s ease, box-shadow .15s ease;
+  }
+  .card.active{border-color:var(--key);box-shadow:0 0 0 3px rgba(111,168,220,0.15);}
+  .card .tag{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--key);font-weight:600;}
+  .card p{margin:6px 0 0 0;font-size:14px;color:var(--muted);}
+  .hint{font-size:12.5px;color:var(--muted);margin-bottom:12px;}
+  .hint kbd{background:var(--tab-bg);border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-family:'JetBrains Mono',monospace;}
+
+  /* ---------- Tables ---------- */
+  table{width:100%;border-collapse:collapse;font-size:14.5px;background:var(--panel);border-radius:10px;overflow:hidden;box-shadow:var(--shadow);}
+  th,td{text-align:left;padding:12px 16px;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{background:var(--tab-bg);font-family:'JetBrains Mono',monospace;font-size:12.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600;}
+  td code{background:var(--tab-bg);padding:2px 6px;border-radius:4px;font-size:13px;}
+  tr:last-child td{border-bottom:none;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+  @media (max-width:800px){.grid2{grid-template-columns:1fr;}}
+
+  /* ---------- Best practice checklist ---------- */
+  .bp-list{display:flex;flex-direction:column;gap:12px;}
+  .bp{
+    display:grid;grid-template-columns:28px 1fr;gap:14px;
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;
+    box-shadow:var(--shadow);
+  }
+  .bp .num{font-family:'JetBrains Mono',monospace;color:var(--action);font-weight:600;font-size:14px;}
+  .bp h4{margin:0 0 4px 0;font-size:15px;}
+  .bp p{margin:0;color:var(--muted);font-size:14px;}
+  .bp code{background:var(--tab-bg);padding:1px 6px;border-radius:4px;}
+  .bp.flag{border-left:3px solid var(--flag);}
+
+  /* ---------- Pills / mini legend ---------- */
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin:18px 0 0 0;font-size:13px;color:var(--muted);font-family:'JetBrains Mono',monospace;}
+  .legend span{display:inline-flex;align-items:center;gap:6px;}
+  .legend i{width:10px;height:10px;border-radius:2px;display:inline-block;}
+
+  footer{padding:36px 0;text-align:center;color:var(--muted);font-size:13px;}
+</style>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="inner">
+    <span class="brand">workflow.yml</span>
+    <a href="#bigpicture">the file</a>
+    <a href="#anatomy">anatomy</a>
+    <a href="#triggers">triggers</a>
+    <a href="#jobs">jobs & runners</a>
+    <a href="#actions">actions</a>
+    <a href="#data">passing data</a>
+    <a href="#control">conditions</a>
+    <a href="#practice">best practice</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <p class="eyebrow">github actions</p>
+      <h1>Anatomy of a <span>workflow</span> YAML file</h1>
+      <p>Every CI/CD pipeline on GitHub is just a text file that answers four questions: when should this run, on what machine, what steps happen, and what should happen if something fails. This guide walks through that file line by line.</p>
+      <div class="path-chip">.github/workflows/deploy.yml</div>
+    </div>
+    <div class="editor">
+      <div class="editor-tabbar">
+        <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+        <div class="editor-tab">deploy.yml</div>
+      </div>
+      <div class="editor-body">
+        <div class="yl"><div class="gutter">1</div><div class="code"><span class="k">name:</span> <span class="v">Build and Deploy</span></div></div>
+        <div class="yl"><div class="gutter">2</div><div class="code"><span class="k">on:</span></div></div>
+        <div class="yl"><div class="gutter">3</div><div class="code">  <span class="k">push:</span></div></div>
+        <div class="yl"><div class="gutter">4</div><div class="code">    <span class="k">branches:</span> [<span class="v">main</span>]</div></div>
+        <div class="yl"><div class="gutter">5</div><div class="code"></div></div>
+        <div class="yl"><div class="gutter">6</div><div class="code"><span class="k">jobs:</span></div></div>
+        <div class="yl"><div class="gutter">7</div><div class="code">  <span class="k">build:</span></div></div>
+        <div class="yl"><div class="gutter">8</div><div class="code">    <span class="k">runs-on:</span> <span class="v">ubuntu-latest</span></div></div>
+        <div class="yl"><div class="gutter">9</div><div class="code">    <span class="k">steps:</span></div></div>
+        <div class="yl"><div class="gutter">10</div><div class="code">      - <span class="k">uses:</span> <span class="a">actions/checkout@v4</span></div></div>
+        <div class="yl"><div class="gutter">11</div><div class="code">      - <span class="k">run:</span> <span class="v">npm ci && npm test</span></div></div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section id="bigpicture">
+  <div class="wrap">
+    <p class="eyebrow">the big picture</p>
+    <h2>What this file actually is</h2>
+    <p class="lede">A workflow is a YAML file sitting in <code>.github/workflows/</code>. GitHub watches your repo for the events you list, and when one happens, it spins up a fresh virtual machine, checks your code onto it, and runs the steps you wrote &mdash; then throws the machine away.</p>
+    <div class="grid2">
+      <table>
+        <tr><th>Level</th><th>What it controls</th></tr>
+        <tr><td><code>workflow</code></td><td>The whole file: its name, what triggers it, shared settings like permissions</td></tr>
+        <tr><td><code>job</code></td><td>A group of steps that all run on the <strong>same machine</strong>, in order</td></tr>
+        <tr><td><code>step</code></td><td>One action: run a command, or use someone's pre-built action</td></tr>
+      </table>
+      <table>
+        <tr><th>Fact</th><th>Why it matters</th></tr>
+        <tr><td>Jobs run in <strong>parallel</strong> by default</td><td>Use <code>needs:</code> to force an order</td></tr>
+        <tr><td>Each job gets a <strong>new VM</strong></td><td>Nothing installed in job A exists in job B</td></tr>
+        <tr><td>Steps run in <strong>sequence</strong></td><td>Step 2 sees whatever step 1 left on disk</td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="anatomy">
+  <div class="wrap">
+    <p class="eyebrow">click to explore</p>
+    <h2>Line-by-line anatomy</h2>
+    <p class="lede">This is a realistic, slightly bigger workflow. Click any line in the editor &mdash; the matching explanation lights up on the right.</p>
+    <p class="hint">Tip: this also works the other way &mdash; click a card and its line highlights. <kbd>click</kbd> to explore.</p>
+
+    <div class="anno-shell">
+      <div class="editor">
+        <div class="editor-tabbar">
+          <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+          <div class="editor-tab">ci.yml</div>
+        </div>
+        <div class="editor-body" id="editorBody">
+          <!-- lines injected by JS from data below, but written statically for correctness -->
+        </div>
+      </div>
+      <div class="cards" id="cardBody"></div>
+    </div>
+  </div>
+</section>
+
+<section id="triggers">
+  <div class="wrap">
+    <p class="eyebrow">on:</p>
+    <h2>Triggers &mdash; what starts a workflow</h2>
+    <p class="lede">The <code>on:</code> key is a list of events. You can trigger from repo activity, a clock, another workflow, or a manual button click.</p>
+    <table>
+      <tr><th>Value</th><th>Fires when&hellip;</th></tr>
+      <tr><td><code>push</code></td><td>Commits are pushed. Narrow it with <code>branches:</code>, <code>tags:</code>, or <code>paths:</code></td></tr>
+      <tr><td><code>pull_request</code></td><td>A PR is opened, updated, or reopened &mdash; the usual choice for running tests before merge</td></tr>
+      <tr><td><code>pull_request_target</code></td><td>Like above, but runs with the base repo's permissions/secrets &mdash; risky with untrusted PR code, see best practices</td></tr>
+      <tr><td><code>schedule</code></td><td>A cron expression, e.g. <code>cron: '0 3 * * *'</code> for a nightly job</td></tr>
+      <tr><td><code>workflow_dispatch</code></td><td>A person clicks "Run workflow" in the GitHub UI &mdash; can accept typed <code>inputs:</code></td></tr>
+      <tr><td><code>workflow_call</code></td><td>Another workflow calls this one as a reusable building block</td></tr>
+      <tr><td><code>release</code>, <code>issues</code>, <code>fork</code>&hellip;</td><td>Dozens more GitHub events, same idea</td></tr>
+    </table>
+  </div>
+</section>
+
+<section id="jobs">
+  <div class="wrap">
+    <p class="eyebrow">jobs.&lt;id&gt;</p>
+    <h2>Jobs and the machines they run on</h2>
+    <p class="lede">Every job needs a <code>runs-on:</code> value &mdash; the operating system image for its throwaway VM.</p>
+    <div class="grid2">
+      <table>
+        <tr><th>runs-on value</th><th>Gives you</th></tr>
+        <tr><td><code>ubuntu-latest</code></td><td>Cheapest, fastest, most common choice</td></tr>
+        <tr><td><code>windows-latest</code></td><td>Windows builds/tests</td></tr>
+        <tr><td><code>macos-latest</code></td><td>Needed for iOS/macOS builds</td></tr>
+        <tr><td><code>self-hosted</code></td><td>Your own machine/runner instead of GitHub's</td></tr>
+        <tr><td><code>[self-hosted, gpu]</code></td><td>Array of labels &mdash; targets a runner with all those tags</td></tr>
+      </table>
+      <table>
+        <tr><th>Job key</th><th>Purpose</th></tr>
+        <tr><td><code>needs: [build]</code></td><td>Wait for another job to finish first</td></tr>
+        <tr><td><code>if:</code></td><td>Only run this job when a condition is true</td></tr>
+        <tr><td><code>strategy.matrix</code></td><td>Run the same job multiple times with different variables (e.g. 3 Node versions)</td></tr>
+        <tr><td><code>timeout-minutes</code></td><td>Kill the job if it hangs past this many minutes</td></tr>
+        <tr><td><code>outputs:</code></td><td>Values this job hands to jobs that <code>need</code> it</td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="actions">
+  <div class="wrap">
+    <p class="eyebrow">uses: vs run:</p>
+    <h2>What a step can actually do</h2>
+    <p class="lede">Inside <code>steps:</code>, each item does one of two things.</p>
+    <div class="grid2">
+      <table>
+        <tr><th><code>run:</code></th><th>Shell commands</th></tr>
+        <tr><td colspan="2">Executes commands directly in the runner's shell &mdash; <code>npm install</code>, <code>pytest</code>, <code>docker build</code>. Use <code>|</code> for multiple lines.</td></tr>
+      </table>
+      <table>
+        <tr><th><code>uses:</code></th><th>A packaged action</th></tr>
+        <tr><td colspan="2">Runs someone else's pre-built action, referenced as <code>owner/repo@ref</code>. Configure it with <code>with:</code>.</td></tr>
+      </table>
+    </div>
+    <br>
+    <table>
+      <tr><th>Common action</th><th>What it does</th></tr>
+      <tr><td><code>actions/checkout@v4</code></td><td>Pulls your repo's code onto the runner &mdash; almost every job's first step</td></tr>
+      <tr><td><code>actions/setup-node@v4</code></td><td>Installs a Node.js version</td></tr>
+      <tr><td><code>actions/cache@v4</code></td><td>Saves/restores folders like <code>node_modules</code> between runs to save time</td></tr>
+      <tr><td><code>actions/upload-artifact@v4</code></td><td>Saves build output so you (or a later job) can download it</td></tr>
+      <tr><td><code>docker/build-push-action@v6</code></td><td>Builds and pushes a Docker image</td></tr>
+    </table>
+    <p style="margin-top:16px;color:var(--muted);font-size:14.5px;">The <code>@ref</code> part is a version pin &mdash; it can be a tag (<code>@v4</code>), a branch (<code>@main</code>), or a full commit SHA. See best practices for which one to actually use.</p>
+  </div>
+</section>
+
+<section id="data">
+  <div class="wrap">
+    <p class="eyebrow">${{ }}</p>
+    <h2>Passing data around</h2>
+    <p class="lede">Workflows talk to themselves through <strong>contexts</strong>, referenced inside double curly braces.</p>
+    <table>
+      <tr><th>Context</th><th>Example</th><th>Holds</th></tr>
+      <tr><td><code>github</code></td><td><code>${{ github.ref }}</code></td><td>Info about the triggering event &mdash; branch, actor, event name</td></tr>
+      <tr><td><code>env</code></td><td><code>${{ env.NODE_ENV }}</code></td><td>Variables set in <code>env:</code> blocks</td></tr>
+      <tr><td><code>secrets</code></td><td><code>${{ secrets.API_KEY }}</code></td><td>Encrypted values from repo/org settings &mdash; never printed in logs</td></tr>
+      <tr><td><code>matrix</code></td><td><code>${{ matrix.node }}</code></td><td>The current value in a matrix strategy loop</td></tr>
+      <tr><td><code>steps</code></td><td><code>${{ steps.build.outputs.hash }}</code></td><td>Output from an earlier step (needs <code>id:</code> on that step)</td></tr>
+      <tr><td><code>needs</code></td><td><code>${{ needs.build.outputs.version }}</code></td><td>Output from a job this one depends on</td></tr>
+    </table>
+    <p style="margin-top:16px;color:var(--muted);font-size:14.5px;"><code>with:</code> sends inputs into an action; <code>env:</code> sets environment variables at workflow, job, or step level (narrower scope wins).</p>
+  </div>
+</section>
+
+<section id="control">
+  <div class="wrap">
+    <p class="eyebrow">if / needs / matrix</p>
+    <h2>Controlling the flow</h2>
+    <div class="grid2">
+      <table>
+        <tr><th>Key</th><th>Use</th></tr>
+        <tr><td><code>if:</code></td><td>Skip a step/job unless a condition holds, e.g. <code>if: github.ref == 'refs/heads/main'</code></td></tr>
+        <tr><td><code>continue-on-error: true</code></td><td>Let the job keep going (and go green) even if this step fails</td></tr>
+        <tr><td><code>fail-fast: false</code></td><td>In a matrix, let every combination finish instead of cancelling the rest on first failure</td></tr>
+      </table>
+      <table>
+        <tr><th>Matrix example</th><th></th></tr>
+        <tr><td colspan="2">
+<div class="mono" style="font-size:13px;">
+<span class="k">strategy:</span><br>
+&nbsp;&nbsp;<span class="k">matrix:</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="k">node:</span> [<span class="v">18</span>, <span class="v">20</span>, <span class="v">22</span>]
+</div>
+        </td></tr>
+        <tr><td colspan="2">Runs the job three times, once per Node version, in parallel.</td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="practice">
+  <div class="wrap">
+    <p class="eyebrow">before you ship it</p>
+    <h2>Best practices</h2>
+    <p class="lede">These are the habits that separate a workflow that works from one that's safe, fast, and cheap to run.</p>
+    <div class="bp-list">
+      <div class="bp flag">
+        <div class="num">01</div>
+        <div><h4>Pin actions to a version, ideally a commit SHA</h4><p>Avoid <code>@main</code> &mdash; it can change under you with no warning. Prefer <code>@v4</code>, or a full SHA for third-party actions you don't fully trust.</p></div>
+      </div>
+      <div class="bp flag">
+        <div class="num">02</div>
+        <div><h4>Set the least permission possible</h4><p>Add <code>permissions: contents: read</code> at the top of the file, then grant more only to the jobs that need it.</p></div>
+      </div>
+      <div class="bp">
+        <div class="num">03</div>
+        <div><h4>Never hardcode a secret</h4><p>Store it in repo/organization Settings → Secrets, and reference it as <code>${{ secrets.NAME }}</code>. GitHub automatically masks it in logs.</p></div>
+      </div>
+      <div class="bp">
+        <div class="num">04</div>
+        <div><h4>Cache what's slow to rebuild</h4><p><code>actions/cache</code> for dependency folders can cut minutes off every run &mdash; and GitHub Actions minutes cost money on private repos.</p></div>
+      </div>
+      <div class="bp">
+        <div class="num">05</div>
+        <div><h4>Cancel stale runs</h4><p>Add a <code>concurrency:</code> group with <code>cancel-in-progress: true</code> so pushing twice in a row doesn't burn double the compute.</p></div>
+      </div>
+      <div class="bp">
+        <div class="num">06</div>
+        <div><h4>Always set a timeout</h4><p><code>timeout-minutes</code> stops a stuck job from quietly running (and billing) for hours.</p></div>
+      </div>
+      <div class="bp flag">
+        <div class="num">07</div>
+        <div><h4>Be careful with <code>pull_request_target</code></h4><p>It runs with your secrets available even for forked PRs. Never check out and run untrusted PR code under this event without isolating it first.</p></div>
+      </div>
+      <div class="bp">
+        <div class="num">08</div>
+        <div><h4>Reuse instead of copy-pasting</h4><p>Repeated step sequences become a <strong>composite action</strong>; repeated whole workflows become a <strong>reusable workflow</strong> called via <code>workflow_call</code>.</p></div>
+      </div>
+      <div class="bp">
+        <div class="num">09</div>
+        <div><h4>Lint the YAML before you push</h4><p>Tools like <code>actionlint</code> catch typo'd keys and bad expressions before GitHub does.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>Built as a teaching reference for GitHub Actions &mdash; try editing the workflow above and see what breaks.</footer>
+
+<script>
+const lines = [
+  {n:1, code:[['k','name:'],['v',' Build and Deploy']], note:"name — the label shown in the Actions tab of your repo. Optional, but makes runs easier to find."},
+  {n:2, code:[['k','on:']], note:"on — the list of events that will trigger this workflow. Everything indented below it is one trigger."},
+  {n:3, code:[['','  '],['k','push:']], note:"push — one trigger type: run whenever commits land."},
+  {n:4, code:[['','    '],['k','branches:'],['v',' [ main ]']], note:"branches — narrows the push trigger so it only fires for commits to main, not every branch."},
+  {n:5, code:[['','  '],['k','pull_request:']], note:"pull_request — a second trigger: also run whenever a PR is opened or updated, regardless of branch."},
+  {n:6, code:[['k','permissions:']], note:"permissions — sets the default access level of the automatic GITHUB_TOKEN for the whole workflow. Least-privilege starts here."},
+  {n:7, code:[['','  '],['k','contents:'],['v',' read']], note:"contents: read — this token can read the repo but can't push, tag, or modify it."},
+  {n:8, code:[['k','concurrency:']], note:"concurrency — groups runs so a new push can cancel an older, now-outdated run of the same workflow."},
+  {n:9, code:[['','  '],['k','group:'],['v',' ${{ github.ref }}']], note:"group — runs sharing this key (here, the branch name) are treated as the same lane."},
+  {n:10, code:[['','  '],['k','cancel-in-progress:'],['v',' true']], note:"cancel-in-progress — kill the older run automatically instead of letting both finish."},
+  {n:11, code:[['k','jobs:']], note:"jobs — the map of everything that actually runs. Each key below (like build, test) is one job."},
+  {n:12, code:[['','  '],['k','test:']], note:"test — this job's ID. You'll reference it from other jobs via needs: test."},
+  {n:13, code:[['','    '],['k','runs-on:'],['v',' ubuntu-latest']], note:"runs-on — the VM image for this job. ubuntu-latest is the fastest, cheapest default."},
+  {n:14, code:[['','    '],['k','strategy:']], note:"strategy — lets you run this same job multiple times with different inputs."},
+  {n:15, code:[['','      '],['k','matrix:']], note:"matrix — the variable(s) to loop over."},
+  {n:16, code:[['','        '],['k','node:'],['v',' [18, 20, 22]']], note:"node — three copies of this job run in parallel, one per Node version, all reachable as matrix.node."},
+  {n:17, code:[['','    '],['k','steps:']], note:"steps — the ordered list of actions this job performs, top to bottom, on one shared machine."},
+  {n:18, code:[['','      - '],['k','uses:'],['a',' actions/checkout@v4']], note:"uses — runs a pre-built action instead of raw shell. checkout@v4 pulls your repo's code onto the runner; almost always step one."},
+  {n:19, code:[['','      - '],['k','uses:'],['a',' actions/setup-node@v4']], note:"A second uses: step — installs Node.js on the runner."},
+  {n:20, code:[['','        '],['k','with:']], note:"with — the inputs passed into the action above, like a function call's arguments."},
+  {n:21, code:[['','          '],['k','node-version:'],['v',' ${{ matrix.node }}']], note:"node-version — pulled straight from the matrix context, so each parallel copy installs a different version."},
+  {n:22, code:[['','      - '],['k','name:'],['v',' Install & test']], note:"name — a human label for this step; shows up in the run's log instead of a raw command."},
+  {n:23, code:[['','        '],['k','run:'],['v',' npm ci && npm test']], note:"run — raw shell commands, executed directly on the runner instead of a packaged action."},
+  {n:24, code:[['','        '],['k','env:']], note:"env — environment variables scoped to just this step."},
+  {n:25, code:[['','          '],['k','CI:'],['v',' true']], note:"CI — a variable many test tools check to change their behavior (e.g. disable interactive prompts)."},
+];
+
+const editorBody = document.getElementById('editorBody');
+const cardBody = document.getElementById('cardBody');
+
+lines.forEach((line, i) => {
+  const yl = document.createElement('div');
+  yl.className = 'yl clickable';
+  yl.dataset.idx = i;
+  const codeHtml = line.code.map(([cls, text]) => cls ? `<span class="${cls}">${text}</span>` : text).join('');
+  yl.innerHTML = `<div class="gutter">${line.n}</div><div class="code">${codeHtml}</div>`;
+  editorBody.appendChild(yl);
+
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.dataset.idx = i;
+  const tagMatch = line.code.find(c => c[0]==='k' || c[0]==='a');
+  const tag = tagMatch ? tagMatch[1].replace(':','').trim() : 'line ' + line.n;
+  card.innerHTML = `<div class="tag">${tag}</div><p>${line.note}</p>`;
+  cardBody.appendChild(card);
+});
+
+function setActive(idx){
+  document.querySelectorAll('.yl.clickable').forEach(el => el.classList.toggle('active', el.dataset.idx == idx));
+  document.querySelectorAll('.card').forEach(el => el.classList.toggle('active', el.dataset.idx == idx));
+  const card = document.querySelector(`.card[data-idx="${idx}"]`);
+  if(card) card.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+editorBody.addEventListener('click', e => {
+  const yl = e.target.closest('.yl.clickable');
+  if(yl) setActive(yl.dataset.idx);
+});
+cardBody.addEventListener('click', e => {
+  const card = e.target.closest('.card');
+  if(card) setActive(card.dataset.idx);
+});
+
+setActive(0);
+</script>
+</body>
+</html>

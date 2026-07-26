@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Wiring Up GitHub MCP</title>
+<style>
+  :root{
+    --bg:#0d1117;
+    --panel:#11161d;
+    --line:#22292f;
+    --text:#d7dde3;
+    --dim:#7b8794;
+    --accent:#5ec9a8;
+    --accent2:#e3a857;
+    --claude:#c98a5e;
+    --opencode:#5ec9a8;
+    --codex:#7aa7e3;
+    --mono:"SFMono-Regular","JetBrains Mono","Fira Code",Consolas,monospace;
+    --serif:"Iowan Old Style","Georgia",serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(circle at 15% 0%, rgba(94,201,168,0.05), transparent 40%),
+      var(--bg);
+    color:var(--text);
+    font-family:var(--serif);
+    line-height:1.5;
+    padding:0 0 80px;
+  }
+  header{
+    padding:64px 24px 40px;
+    max-width:880px;
+    margin:0 auto;
+    border-bottom:1px solid var(--line);
+  }
+  .eyebrow{
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--accent);
+    margin:0 0 14px;
+  }
+  h1{
+    font-size:2.6rem;
+    margin:0 0 14px;
+    font-weight:600;
+    letter-spacing:-0.01em;
+  }
+  header p{
+    color:var(--dim);
+    font-size:1.05rem;
+    max-width:640px;
+    margin:0;
+  }
+  main{
+    max-width:880px;
+    margin:0 auto;
+    padding:0 24px;
+  }
+  section{
+    padding:48px 0;
+    border-bottom:1px solid var(--line);
+  }
+  section:last-of-type{border-bottom:none;}
+  h2{
+    font-size:1.5rem;
+    margin:0 0 6px;
+    display:flex;
+    align-items:baseline;
+    gap:12px;
+  }
+  .tag{
+    font-family:var(--mono);
+    font-size:11px;
+    padding:3px 9px;
+    border-radius:99px;
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    font-weight:600;
+    color:#0d1117;
+  }
+  .tag.claude{background:var(--claude);}
+  .tag.opencode{background:var(--opencode);}
+  .tag.codex{background:var(--codex);}
+  .sub{color:var(--dim);margin:0 0 20px;font-size:0.98rem;}
+  pre{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-left:3px solid var(--accent);
+    border-radius:6px;
+    padding:18px 20px;
+    overflow-x:auto;
+    font-family:var(--mono);
+    font-size:13.5px;
+    line-height:1.6;
+    margin:0 0 14px;
+  }
+  section[data-tool="opencode"] pre{border-left-color:var(--opencode);}
+  section[data-tool="codex"] pre{border-left-color:var(--codex);}
+  code{font-family:var(--mono);}
+  .comment{color:var(--dim);}
+  .str{color:var(--accent2);}
+  .key{color:#e39a9a;}
+  .note{
+    font-size:0.92rem;
+    color:var(--dim);
+    border-left:2px solid var(--line);
+    padding-left:14px;
+    margin:14px 0 0;
+  }
+  .note strong{color:var(--text);}
+  table{
+    width:100%;
+    border-collapse:collapse;
+    font-family:var(--mono);
+    font-size:13px;
+    margin-top:8px;
+  }
+  th,td{
+    text-align:left;
+    padding:10px 12px;
+    border-bottom:1px solid var(--line);
+  }
+  th{color:var(--dim);font-weight:600;text-transform:uppercase;font-size:11px;letter-spacing:0.06em;}
+  td:first-child, th:first-child{color:var(--text);font-weight:600;}
+  .steps{counter-reset:step;list-style:none;margin:0;padding:0;}
+  .steps li{
+    counter-increment:step;
+    padding-left:38px;
+    position:relative;
+    margin-bottom:16px;
+    color:var(--dim);
+  }
+  .steps li::before{
+    content:counter(step);
+    position:absolute;
+    left:0;top:0;
+    width:24px;height:24px;
+    border-radius:50%;
+    border:1px solid var(--line);
+    color:var(--accent);
+    font-family:var(--mono);
+    font-size:12px;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .steps li b{color:var(--text);}
+  footer{
+    max-width:880px;
+    margin:40px auto 0;
+    padding:0 24px;
+    color:var(--dim);
+    font-size:0.85rem;
+    font-family:var(--mono);
+  }
+  a{color:var(--accent);}
+</style>
+</head>
+<body>
+
+<header>
+  <p class="eyebrow">Workshop handout · MCP setup</p>
+  <h1>Wiring up the GitHub MCP server</h1>
+  <p>Model Context Protocol (MCP) lets an AI coding tool call GitHub's API directly &mdash; opening PRs, reading issues, checking CI &mdash; instead of you copy-pasting things into chat. GitHub hosts an official remote server, so no local install is required. Same idea, three different config files.</p>
+</header>
+
+<main>
+
+  <section data-tool="claude">
+    <h2>Claude Code <span class="tag claude">CLI command</span></h2>
+    <p class="sub">Configured with the <code>claude mcp</code> command, not by hand-editing a file.</p>
+    <pre><span class="comment"># get a fine-grained PAT first: github.com/settings/personal-access-tokens</span>
+claude mcp add --transport http github https://api.githubcopilot.com/mcp/ \
+  --header "Authorization: Bearer YOUR_GITHUB_PAT"</pre>
+    <p class="sub">Or, if you want it checked into the repo for teammates (project scope), it writes to <code>.mcp.json</code>:</p>
+    <pre>{
+  "<span class="key">mcpServers</span>": {
+    "<span class="key">github</span>": {
+      "<span class="key">type</span>": "<span class="str">http</span>",
+      "<span class="key">url</span>": "<span class="str">https://api.githubcopilot.com/mcp</span>",
+      "<span class="key">headers</span>": { "<span class="key">Authorization</span>": "<span class="str">Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}</span>" }
+    }
+  }
+}</pre>
+    <p class="note">Verify with <strong><code>/mcp</code></strong> inside a Claude Code session &mdash; it should show <code>connected</code>.</p>
+  </section>
+
+  <section data-tool="opencode">
+    <h2>OpenCode <span class="tag opencode">opencode.json</span></h2>
+    <p class="sub">Lives in <code>opencode.json</code>, edited directly.</p>
+    <pre>{
+  "<span class="key">$schema</span>": "<span class="str">https://opencode.ai/config.json</span>",
+  "<span class="key">mcp</span>": {
+    "<span class="key">github</span>": {
+      "<span class="key">type</span>": "<span class="str">remote</span>",
+      "<span class="key">url</span>": "<span class="str">https://api.githubcopilot.com/mcp</span>",
+      "<span class="key">enabled</span>": true,
+      "<span class="key">headers</span>": {
+        "<span class="key">Authorization</span>": "<span class="str">Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}</span>"
+      }
+    }
+  }
+}</pre>
+    <p class="note">Prefer a locally-run server instead of GitHub's hosted one? Use <code>"type": "local"</code> with a <code>command</code> array (e.g. <code>npx -y @modelcontextprotocol/server-github</code>) and an <code>environment</code> block for the token.</p>
+  </section>
+
+  <section data-tool="codex">
+    <h2>Codex CLI <span class="tag codex">config.toml</span></h2>
+    <p class="sub">TOML, not JSON, in <code>~/.codex/config.toml</code> (global) or <code>.codex/config.toml</code> (per project).</p>
+    <pre>[mcp_servers.github]
+url = "https://api.githubcopilot.com/mcp/"
+bearer_token_env_var = "GITHUB_PAT_TOKEN"</pre>
+    <p class="sub">Then export the token before launching Codex, or put it in a <code>.env</code> file:</p>
+    <pre>export GITHUB_PAT_TOKEN=ghp_your_token_here</pre>
+    <p class="sub">Or skip the file entirely and let the CLI write it for you:</p>
+    <pre>codex mcp add github --url https://api.githubcopilot.com/mcp/ \
+  --bearer-token-env-var GITHUB_PAT_TOKEN</pre>
+  </section>
+
+  <section>
+    <h2>Same idea, three dialects</h2>
+    <table>
+      <tr><th></th><th>Claude Code</th><th>OpenCode</th><th>Codex</th></tr>
+      <tr><td>File format</td><td>JSON (or CLI)</td><td>JSON</td><td>TOML</td></tr>
+      <tr><td>File name</td><td><code>.mcp.json</code></td><td><code>opencode.json</code></td><td><code>config.toml</code></td></tr>
+      <tr><td>Top-level key</td><td><code>mcpServers</code></td><td><code>mcp</code></td><td><code>mcp_servers</code></td></tr>
+      <tr><td>Remote server marker</td><td><code>"type": "http"</code></td><td><code>"type": "remote"</code></td><td>just add a <code>url</code></td></tr>
+      <tr><td>Local server marker</td><td>omit <code>type</code></td><td><code>"type": "local"</code></td><td>use <code>command</code> + <code>args</code></td></tr>
+      <tr><td>Token reference</td><td><code>${VAR}</code></td><td><code>${VAR}</code></td><td><code>bearer_token_env_var</code></td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>The 3-step mental model</h2>
+    <ol class="steps">
+      <li><b>Get a token.</b> Generate a fine-grained GitHub PAT scoped only to the repos you need.</li>
+      <li><b>Point your tool at the server.</b> Same URL everywhere: <code>https://api.githubcopilot.com/mcp/</code> &mdash; just different syntax per tool.</li>
+      <li><b>Check the connection.</b> <code>claude mcp list</code>, OpenCode's server status, or <code>codex mcp list</code> &mdash; always verify before assuming it works.</li>
+    </ol>
+  </section>
+
+</main>
+
+<footer>
+  Never commit a real token into a config file &mdash; use an env var reference instead.
+</footer>
+
+</body>
+</html>
